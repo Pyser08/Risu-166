@@ -120,6 +120,75 @@ export async function importPlugin() {
             return
         }
 
+        let apiInternalVersion: 2|'2.1'|'3.0' = '2.1'
+
+        if(apiVersion === '2.1'){
+            const safety = await checkCodeSafety(jsFile)
+            if(!safety.isSafe){
+                pluginAlertModalStore.errors = safety.errors
+                pluginAlertModalStore.open = true
+                
+                //I can use event but lazy
+                while(pluginAlertModalStore.open){
+                    await sleep(100)
+                }
+
+                if(pluginAlertModalStore.errors.length > 0){
+                    return
+                }
+            }
+            apiInternalVersion = '2.1'
+        }
+        else if(apiVersion === '2.0'){
+            const mediaRegex = /(https?):\/\/[^\s\'\"]+\.(?:png|jpg|jpeg|gif|webp|svg|mp3|wav|ogg|mp4|webm)/gi;
+            const hasExternalMedia = mediaRegex.test(jsFile);
+            const jsRegex = /(https?):\/\/[^\s\'\"]+\.js/gi;
+            const hasExternalJS = jsRegex.test(jsFile);
+
+            let confirmMessage = `${name}`;
+            if (hasExternalMedia) {
+                confirmMessage += `\n${language.pluginContainsExternalMedia}`;
+            }
+            if (hasExternalJS) {
+                confirmMessage += `\n${language.pluginContainsExternalJS}`;
+            }
+            confirmMessage += `\n\n${language.pluginConfirm}`;
+
+            if (!await alertPluginConfirm(confirmMessage)) {
+                return
+            }
+
+            pluginAlertModalStore.errors = [
+                {
+                    message: 'This plugin is using 2.0 API, which is unsafe, alerting all safety errors rather than checking.',
+                    userAlertKey: 'eval'
+                },
+                {
+                    message: 'This plugin is using 2.0 API, which is unsafe, alerting all safety errors rather than checking.',
+                    userAlertKey: 'globalAccess'
+                },
+                {
+                    message: 'This plugin is using 2.0 API, which is unsafe, alerting all safety errors rather than checking.',
+                    userAlertKey: 'storageAccess'
+                }
+            ]
+            pluginAlertModalStore.open = true
+
+            //I can use event but lazy
+            while(pluginAlertModalStore.open){
+                await sleep(100)
+            }
+            if(pluginAlertModalStore.errors.length > 0){
+                return
+            }
+
+            apiInternalVersion = 2
+        }
+        else if(apiVersion === '3.0'){
+            apiInternalVersion = '3.0'
+        }
+
+        
         let pluginData: RisuPlugin = {
             name: name,
             script: jsFile,
